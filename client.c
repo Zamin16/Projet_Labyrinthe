@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <limits.h>
 #define BUFSIZE 256
 
 struct pave {
@@ -30,7 +31,6 @@ struct joueur{
 struct Edge {
   int u;
   int v;
-  int w;
 };
 
 struct Graph {
@@ -183,50 +183,85 @@ struct Edge *creat_edge(int origin, int dest){
   struct Edge *edge = malloc(sizeof(struct Edge));
   edge->u = origin;
   edge->v = dest;
-  edge->w = 1;
   return edge;
+}
+
+int count_not_wall(struct save *tab){
+  int count = 0;
+  for (size_t i = 0; i < tab->height; i++) {
+    for (size_t j = 0; j < tab->width; j++) {
+      if (tab->data[i*tab->width+j]->value != '#') {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+int find_wich_node_itfo(struct save *tab) {
+  int count = 0;
+  for (size_t i = 0; i < tab->height; i++) {
+    for (size_t j = 0; j < tab->width; j++) {
+      if ((int)tab->data[i*tab->width+j]->value == (int)'P') {
+        return count;
+      }
+    }
+  }
+  return count;
+}
+
+void destroy_node(struct Graph *graph){
+  for (size_t i = 0; i < graph->nbEdge; i++) {
+    free(graph->edge[i]);
+  }
+  free(graph->edge);
 }
 
 
 void create_graph(struct Graph *graph,struct save *tab){
-  graph->nbNode = tab->width*tab->height;
-  graph->edge = calloc(tab->width*tab->height*4,sizeof(struct Edge *));
+  graph->nbNode = count_not_wall(tab);
+  fprintf(stderr, "%i\n",graph->nbNode );
+  graph->edge = calloc(graph->nbNode*4,sizeof(struct Edge *));
   int count_edge = 0;
   int dest,origin;
   for (int y = 0; y < tab->height; y++) {
     for (int x = 0; x < tab->width; x++) {
 
       origin = y*tab->width+x;
-      if ((tab->data[origin]->value == '_' || tab->data[origin]->value == 'P') && tab->data[origin]->marked > 0) {
+      if (tab->data[origin]->value != '#') {
+
         dest = (y-1)*tab->width+x;
-        if (dest >= 0 && y-1 >= 0) {
-          if ((tab->data[dest]->value == '_' || tab->data[dest]->value == 'P') && tab->data[dest]->marked > 0) {
+        if (dest >= 0 && y*tab->width >= dest) {
+          if (tab->data[dest]->value != '#') {
             graph->edge[count_edge] = creat_edge(origin,dest);
-            fprintf(stderr, "%i to %i N\n",origin ,graph->edge[count_edge]->v);
+            //fprintf(stderr, "%i to %i N\n",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
+
         dest = y*tab->width+x+1;
-        if (dest < graph->nbNode && x+1 < tab->width) {
-          if ((tab->data[dest]->value == '_' || tab->data[dest]->value == 'P') && tab->data[dest]->marked > 0) {
+        if (dest < tab->height*tab->width && x+1 < tab->width) {
+          if (tab->data[dest]->value != '#') {
             graph->edge[count_edge] = creat_edge(origin,dest);
-            fprintf(stderr, "%i to %i E\n",origin ,graph->edge[count_edge]->v);
+            //fprintf(stderr, "%i to %i E\n",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
+
         dest = y*tab->width+x-1;
-        if (dest >= 0 && x-1 <= 0) {
-          if ((tab->data[dest]->value == '_' || tab->data[dest]->value == 'P') && tab->data[dest]->marked > 0) {
+        if (dest >= 0 && x-1 >= 0) {
+          if (tab->data[dest]->value != '#') {
             graph->edge[count_edge] = creat_edge(origin,dest);
-            fprintf(stderr, "%i to %i W\n",origin ,graph->edge[count_edge]->v);
+            //fprintf(stderr, "%i to %i W\n",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
+
         dest = (y+1)*tab->width+x;
-        if (dest < graph->nbNode && y+1 < tab->height) {
-          if ((tab->data[dest]->value == '_' || tab->data[dest]->value == 'P') && tab->data[dest]->marked > 0) {
+        if (dest < tab->height*tab->width && y+1 < tab->height) {
+          if (tab->data[dest]->value != '#') {
             graph->edge[count_edge] = creat_edge(origin,dest);
-            fprintf(stderr, "%i to %i S\n",origin ,graph->edge[count_edge]->v);
+            //fprintf(stderr, "%i to %i S\n",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
@@ -239,9 +274,77 @@ void create_graph(struct Graph *graph,struct save *tab){
 }
 
 
+void FinalSolution(int dist[], int n) {
+// This function prints the final solution
+    fprintf(stderr, "\nVertex\tDistance from Source Vertex\n");
+    int i;
+
+    for (i = 0; i < n; ++i){
+      fprintf(stderr, "%d \t\t %d\n", i, dist[i]);
+    }
+}
+/*
+void BellmanFord(struct Graph* graph, int source) {
+    int n = graph->nbNode;
+    int e = graph->nbEdge;
+
+    int StoreDistance[n];
+    int p[n]
+
+    int i,j;
+
+    // This is initial step that we know , we initialize all distance to infinity except source.
+// We assign source distance as 0(zero)
+
+    for (i = 0; i < n; i++){
+        StoreDistance[i] = INT_MAX-10;
+    }
+    fprintf(stderr, "Source = %i\n",source );
+    StoreDistance[source] = 0;
+
+    //The shortest path of graph that contain V vertices, never contain "V-1" edges. So we do here "V-1" relaxations
+    for (i = 1; i <= n-1; i++) {
+        for (j = 0; j < e; j++) {
+            int u = graph->edge[j]->u;
+            int v = graph->edge[j]->v;
+
+            if (StoreDistance[u] + 1 < StoreDistance[v]) {
+              StoreDistance[v] = StoreDistance[u] + 1;
+            }
+            FinalSolution(StoreDistance, n);
+        }
+    }
+
+    // Actually upto now shortest path found. But BellmanFord checks for negative edge cycle. In this step we check for that
+    // shortest distances if graph doesn't contain negative weight cycle.
+
+    // If we get a shorter path, then there is a negative edge cycle.
+    for (i = 0; i < e; i++) {
+        int u = graph->edge[i]->u;
+        int v = graph->edge[i]->v;
+
+        if (StoreDistance[u] + 1 < StoreDistance[v]){
+          fprintf(stderr, "This graph contains negative edge cycle\n");
+        }
+    }
+
+
+    FinalSolution(StoreDistance, n);
+    return;
+}
+*/
+
+void display(int arr[], int size) {
+  int i;
+  for (i = 0; i < size; i++) {
+    fprintf(stderr, "%d ", arr[i]);
+  }
+  fprintf(stderr, "\n");
+}
+
 void bellmanford(struct Graph *g, int source) {
   //variables
-  int i, j, u, v, w;
+  int i, j, u, v;
 
   //total vertex in the graph g
   int tV = g->nbNode;
@@ -259,7 +362,7 @@ void bellmanford(struct Graph *g, int source) {
 
   //step 1: fill the distance array and predecessor array
   for (i = 0; i < tV; i++) {
-    d[i] = g->nbNode*g->nbNode;
+    d[i] = INT_MAX;
     p[i] = 0;
   }
 
@@ -272,50 +375,19 @@ void bellmanford(struct Graph *g, int source) {
       //get the edge data
       u = g->edge[j]->u;
       v = g->edge[j]->v;
-      w = g->edge[j]->w;
 
-      if (d[u] != g->nbNode*g->nbNode && d[v] > d[u] + w) {
-        d[v] = d[u] + w;
+      if (d[u] != INT_MAX && d[v] > d[u] + 1) {
+        d[v] = d[u] + 1;
         p[v] = u;
       }
     }
   }
 
-  //step 3: detect negative cycle
-  //if value changes then we have a negative cycle in the graph
-  //and we cannot find the shortest distances
-  for (i = 0; i < tE; i++) {
-    u = g->edge[i]->u;
-    v = g->edge[i]->v;
-    w = g->edge[i]->w;
-    if (d[u] != g->nbNode*g->nbNode && d[v] > d[u] + w) {
-      printf("Negative weight cycle detected!\n");
-      return;
-    }
-  }
-
-  //No negative weight cycle found!
-  //print the distance and predecessor array
   printf("Distance array: ");
-  for (i = 0; i < tV; i++) {
-    fprintf(stderr, "%d ", d[i]);
-  }
-  fprintf(stderr, "\n");
+  display(d, tV);
   printf("Predecessor array: ");
-  for (i = 0; i < tV; i++) {
-    fprintf(stderr, "%d ", p[i]);
-  }
-  fprintf(stderr, "\n");
+  display(p, tV);
 }
-
-void display(int arr[], int size) {
-  int i;
-  for (i = 0; i < size; i++) {
-    fprintf(stderr, "%d ", arr[i]);
-  }
-  fprintf(stderr, "\n");
-}
-
 
 
 
@@ -380,32 +452,45 @@ int main() {
     save_information(buf,tab,player);
     print_tab_in_error(tab);
 
-    create_graph(graph,tab);
-    //bellmanford(graph,player->currx+player->curry*tab->width);
+    best_pave = find_best_pave(tab,player);
+    fprintf(stderr, "Best pave = %i\n",best_pave );
+    if (best_pave == player->currx+player->curry*tab->width) {
+      fprintf(stderr, "Best pave == Joueur \n" );
+    }
 
     // update the state of the game
     // send the new direction
-    best_pave = find_best_pave(tab,player);
-    fprintf(stderr, "Best pave = %i\n",best_pave );
-    dist = tab->height*tab->width+1;
     // or "SOUTH" or "EAST" or "WEST"
-    if (buf[1] == '_' && tab->data[player->currx+(player->curry-1)*tab->width]->distance_to_treasure <= dist ) {
-        rep = "NORTH";
-        dist = tab->data[player->currx+(player->curry-1)*tab->width]->distance_to_treasure;
+    if (best_pave == player->currx+player->curry*tab->width) {
+      dist = tab->height*tab->width+1;
+      int dest = player->currx+(player->curry-1)*tab->width;
+      if (buf[1] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+          rep = "NORTH";
+          dist = tab->data[dest]->distance_to_treasure;
+      }
+      dest = player->currx+1+(player->curry)*tab->width;
+      if (buf[4] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+          rep = "EAST";
+          dist = tab->data[dest]->distance_to_treasure;
+      }
+      dest = player->currx-1+(player->curry)*tab->width;
+      if (buf[3] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+        rep = "WEST";
+        dist = tab->data[dest]->distance_to_treasure;
+      }
+      dest = player->currx+(player->curry+1)*tab->width;
+      if (buf[6] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+        rep = "SOUTH";
+        dist = tab->data[dest]->distance_to_treasure;
+      }
+    }else{
+      fprintf(stderr, "a la chance\n");
+      create_graph(graph,tab);
+      if (graph->nbNode != 0) {
+        bellmanford(graph,find_wich_node_itfo(tab));
+      }
+      destroy_node(graph);
     }
-    if (buf[4] == '_' && tab->data[player->currx+1+(player->curry)*tab->width]->distance_to_treasure <= dist ) {
-        rep = "EAST";
-        dist = tab->data[player->currx+1+(player->curry)*tab->width]->distance_to_treasure;
-    }
-    if (buf[3] == '_' && tab->data[player->currx-1+(player->curry)*tab->width]->distance_to_treasure <= dist ) {
-      rep = "WEST";
-      dist = tab->data[player->currx-1+(player->curry)*tab->width]->distance_to_treasure;
-    }
-    if (buf[6] == '_' && tab->data[player->currx+(player->curry+1)*tab->width]->distance_to_treasure <= dist ) {
-      rep = "SOUTH";
-      dist = tab->data[player->currx+(player->curry+1)*tab->width]->distance_to_treasure;
-    }
-    //tab->data[best_pave]->value = 'B';
 
 
 
@@ -428,7 +513,6 @@ int main() {
       }
     }
     fprintf(stderr, "%s\n",rep );
-    free(graph->edge);
 
     // get the result
     fgets(buf, BUFSIZE, stdin);
