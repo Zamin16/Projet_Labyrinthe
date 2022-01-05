@@ -31,6 +31,7 @@ struct joueur{
 struct Edge {
   int u;
   int v;
+  int w;
 };
 
 struct Graph {
@@ -83,14 +84,23 @@ void save_information(char *buf,struct save *tab,struct joueur *player){
 }
 
 void print_tab_in_error(struct save *tab){
+  fprintf(stderr, "00|");
   for (size_t l = 0; l < tab->width; l++) {
-    fprintf(stderr, "%li|", l);
+    if (l < 10) {
+      fprintf(stderr, "0%li|", l);
+    }else{
+      fprintf(stderr, "%li|", l);
+    }
   }
   fprintf(stderr, "\n");
   for (size_t j = 0; j < tab->height; j++) {
-    fprintf(stderr, "%li|", j);
+    if (j < 10) {
+      fprintf(stderr, "0%li|", j);
+    }else{
+      fprintf(stderr, "%li|", j);
+    }
     for (size_t i = 0; i < tab->width; i++) {
-      fprintf(stderr, "%c|", tab->data[j*tab->width+i]->value);
+      fprintf(stderr, "%c%c|", tab->data[j*tab->width+i]->value,tab->data[j*tab->width+i]->value);
     }
     fprintf(stderr, "\n");
   }
@@ -179,10 +189,11 @@ int find_best_pave(struct save *tab, struct joueur *player){
 }
 
 
-struct Edge *creat_edge(int origin, int dest){
+struct Edge *creat_edge(int origin, int dest, int weight){
   struct Edge *edge = malloc(sizeof(struct Edge));
   edge->u = origin;
   edge->v = dest;
+  edge->w = weight;
   return edge;
 }
 
@@ -198,12 +209,15 @@ int count_not_wall(struct save *tab){
   return count;
 }
 
-int find_wich_node_itfo(struct save *tab) {
+int count_wall_to(struct save *tab,int dest){
   int count = 0;
   for (size_t i = 0; i < tab->height; i++) {
     for (size_t j = 0; j < tab->width; j++) {
-      if ((int)tab->data[i*tab->width+j]->value == (int)'P') {
+      if (i*tab->width+j == dest) {
         return count;
+      }
+      if (tab->data[i*tab->width+j]->value == '#') {
+        count++;
       }
     }
   }
@@ -219,8 +233,9 @@ void destroy_node(struct Graph *graph){
 
 
 void create_graph(struct Graph *graph,struct save *tab){
-  graph->nbNode = count_not_wall(tab);
-  fprintf(stderr, "%i\n",graph->nbNode );
+  graph->nbNode = tab->width*tab->height;
+  int max = (tab->width+10)*tab->height;
+  //fprintf(stderr, "%i\n",graph->nbNode );
   graph->edge = calloc(graph->nbNode*4,sizeof(struct Edge *));
   int count_edge = 0;
   int dest,origin;
@@ -228,43 +243,71 @@ void create_graph(struct Graph *graph,struct save *tab){
     for (int x = 0; x < tab->width; x++) {
 
       origin = y*tab->width+x;
-      if (tab->data[origin]->value != '#') {
+      if (tab->data[origin]->value == 'P' || tab->data[origin]->value == '_' || tab->data[origin]->value == '0') {
 
         dest = (y-1)*tab->width+x;
         if (dest >= 0 && y*tab->width >= dest) {
-          if (tab->data[dest]->value != '#') {
-            graph->edge[count_edge] = creat_edge(origin,dest);
-            //fprintf(stderr, "%i to %i N\n",origin ,graph->edge[count_edge]->v);
+          if (tab->data[dest]->value == 'P' || tab->data[dest]->value == '_' || tab->data[dest]->value == '0') {
+            graph->edge[count_edge] = creat_edge(origin,dest,1);
+            //fprintf(stderr, "  %i to %i N with weight 1  |",origin ,graph->edge[count_edge]->v);
+            count_edge++;
+          }else{
+            graph->edge[count_edge] = creat_edge(origin,dest,max);
+            //fprintf(stderr, "  %i to %i N with weight max  |",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
 
         dest = y*tab->width+x+1;
         if (dest < tab->height*tab->width && x+1 < tab->width) {
-          if (tab->data[dest]->value != '#') {
-            graph->edge[count_edge] = creat_edge(origin,dest);
-            //fprintf(stderr, "%i to %i E\n",origin ,graph->edge[count_edge]->v);
+          if (tab->data[dest]->value == 'P' || tab->data[dest]->value == '_' || tab->data[dest]->value == '0') {
+            graph->edge[count_edge] = creat_edge(origin,dest,1);
+            //fprintf(stderr, "  %i to %i E with weight 1  |",origin ,graph->edge[count_edge]->v);
+            count_edge++;
+          }else{
+            graph->edge[count_edge] = creat_edge(origin,dest,max);
+            //fprintf(stderr, "  %i to %i E with weight max  |",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
 
         dest = y*tab->width+x-1;
         if (dest >= 0 && x-1 >= 0) {
-          if (tab->data[dest]->value != '#') {
-            graph->edge[count_edge] = creat_edge(origin,dest);
-            //fprintf(stderr, "%i to %i W\n",origin ,graph->edge[count_edge]->v);
+          if (tab->data[dest]->value == 'P' || tab->data[dest]->value == '_' || tab->data[dest]->value == '0') {
+            graph->edge[count_edge] = creat_edge(origin,dest,1);
+            //fprintf(stderr, "  %i to %i W with weight 1  |",origin ,graph->edge[count_edge]->v);
+            count_edge++;
+          }else{
+            graph->edge[count_edge] = creat_edge(origin,dest,max);
+            //fprintf(stderr, "  %i to %i W with weight max  |",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
 
         dest = (y+1)*tab->width+x;
         if (dest < tab->height*tab->width && y+1 < tab->height) {
-          if (tab->data[dest]->value != '#') {
-            graph->edge[count_edge] = creat_edge(origin,dest);
-            //fprintf(stderr, "%i to %i S\n",origin ,graph->edge[count_edge]->v);
+          if (tab->data[dest]->value == 'P' || tab->data[dest]->value == '_' || tab->data[dest]->value == '0') {
+            graph->edge[count_edge] = creat_edge(origin,dest,1);
+            //fprintf(stderr, "  %i to %i S with weight 1  |",origin ,graph->edge[count_edge]->v);
+            count_edge++;
+          }else{
+            graph->edge[count_edge] = creat_edge(origin,dest,max);
+            //fprintf(stderr, "  %i to %i S with weight max  |",origin ,graph->edge[count_edge]->v);
             count_edge++;
           }
         }
+        //fprintf(stderr, "\n" );
+
+      }else{
+        graph->edge[count_edge] = creat_edge(origin,(y-1)*tab->width+x,max);
+        count_edge++;
+        graph->edge[count_edge] = creat_edge(origin,y*tab->width+x+1,max);
+        count_edge++;
+        graph->edge[count_edge] = creat_edge(origin,y*tab->width+x-1,max);
+        count_edge++;
+        graph->edge[count_edge] = creat_edge(origin,(y+1)*tab->width+x,max);
+        count_edge++;
+        //fprintf(stderr, "%i to NEWS with weight max\n",origin);
       }
 
     }
@@ -283,74 +326,73 @@ void FinalSolution(int dist[], int n) {
       fprintf(stderr, "%d \t\t %d\n", i, dist[i]);
     }
 }
-/*
-void BellmanFord(struct Graph* graph, int source) {
-    int n = graph->nbNode;
-    int e = graph->nbEdge;
 
-    int StoreDistance[n];
-    int p[n]
-
-    int i,j;
-
-    // This is initial step that we know , we initialize all distance to infinity except source.
-// We assign source distance as 0(zero)
-
-    for (i = 0; i < n; i++){
-        StoreDistance[i] = INT_MAX-10;
-    }
-    fprintf(stderr, "Source = %i\n",source );
-    StoreDistance[source] = 0;
-
-    //The shortest path of graph that contain V vertices, never contain "V-1" edges. So we do here "V-1" relaxations
-    for (i = 1; i <= n-1; i++) {
-        for (j = 0; j < e; j++) {
-            int u = graph->edge[j]->u;
-            int v = graph->edge[j]->v;
-
-            if (StoreDistance[u] + 1 < StoreDistance[v]) {
-              StoreDistance[v] = StoreDistance[u] + 1;
-            }
-            FinalSolution(StoreDistance, n);
-        }
-    }
-
-    // Actually upto now shortest path found. But BellmanFord checks for negative edge cycle. In this step we check for that
-    // shortest distances if graph doesn't contain negative weight cycle.
-
-    // If we get a shorter path, then there is a negative edge cycle.
-    for (i = 0; i < e; i++) {
-        int u = graph->edge[i]->u;
-        int v = graph->edge[i]->v;
-
-        if (StoreDistance[u] + 1 < StoreDistance[v]){
-          fprintf(stderr, "This graph contains negative edge cycle\n");
-        }
-    }
-
-
-    FinalSolution(StoreDistance, n);
-    return;
-}
-*/
 
 void display(int arr[], int size) {
-  int i;
-  for (i = 0; i < size; i++) {
-    fprintf(stderr, "%d ", arr[i]);
+  for (int i = 0; i < size; i++) {
+    if (i%45 == 0) {
+      fprintf(stderr, "\n");
+    }
+    if (arr[i] < 10) {
+      fprintf(stderr, "0%d ", arr[i]);
+    }else{
+      fprintf(stderr, "%d ", arr[i]);
+    }
   }
+  fprintf(stderr, "\n");
   fprintf(stderr, "\n");
 }
 
-void bellmanford(struct Graph *g, int source) {
+char *translate_path(int s[], int count){
+  char *path = calloc(count,sizeof(char));
+  int lenght = 0;
+  if (count <= 1) {
+    path[0] = '\0';
+    return path;
+  }
+
+  for (size_t i = count-2; i != 0; i--) {
+    if (s[i+1] == s[i]+1) {
+      path[lenght] = 'W';
+      //fprintf(stderr, "E\n");
+      lenght++;
+    }else{
+      if (s[i+1] == s[i]-1) {
+        path[lenght] = 'E';
+        //fprintf(stderr, "W\n");
+        lenght++;
+      }else{
+        if (s[i+1] > s[i]) {
+          path[lenght] = 'N';
+          //fprintf(stderr, "S\n");
+          lenght++;
+        }else{
+          if (s[i+1] < s[i]) {
+            path[lenght] = 'S';
+            //fprintf(stderr, "N\n");
+            lenght++;
+          }
+        }
+      }
+    }
+  }
+  path[lenght] ='\0';
+  fprintf(stderr, "%s\n",path );
+  return path;
+}
+
+char *bellmanford(struct Graph *g, int source, int dest) {
+  //fprintf(stderr, "%i\n",source );
+  //fprintf(stderr, "%i\n",dest );
   //variables
-  int i, j, u, v;
+  int i, j, u, v, w;
 
   //total vertex in the graph g
   int tV = g->nbNode;
 
   //total edge in the graph g
   int tE = g->nbEdge;
+  int max = tV*2;
 
   //distance array
   //size equal to the number of vertices of the graph g
@@ -362,12 +404,13 @@ void bellmanford(struct Graph *g, int source) {
 
   //step 1: fill the distance array and predecessor array
   for (i = 0; i < tV; i++) {
-    d[i] = INT_MAX;
+    d[i] = max;
     p[i] = 0;
   }
 
   //mark the source vertex
   d[source] = 0;
+  p[source] = 0;
 
   //step 2: relax edges |V| - 1 times
   for (i = 1; i <= tV - 1; i++) {
@@ -375,29 +418,44 @@ void bellmanford(struct Graph *g, int source) {
       //get the edge data
       u = g->edge[j]->u;
       v = g->edge[j]->v;
+      w = g->edge[j]->w;
 
-      if (d[u] != INT_MAX && d[v] > d[u] + 1) {
-        d[v] = d[u] + 1;
-        p[v] = u;
+      if (d[u] != max && d[v] > d[u] + w) {
+        d[v] = d[u] + w;
+        if (d[u] + w > tV) {
+          p[v] = -1;
+        }else{
+          p[v] = u;
+        }
+
       }
     }
   }
 
-  printf("Distance array: ");
-  display(d, tV);
-  printf("Predecessor array: ");
-  display(p, tV);
-}
+  //display(d,tV);
+  //display(p, tV);
+  //FinalSolution(d,tV);
 
+  int s[tV];
+  s[0] = dest;
+  int count = 1;
 
-
-
-char *go_to_point(struct save *tab,struct joueur *player,int dest){
-  if (dest == player->curry*tab->width+player->currx) {
-    return '\0';
+  while (dest != source) {
+    if (p[dest] == -1) {
+      break;
+    }
+    s[count] = p[dest];
+    dest = p[dest];
+    fprintf(stderr, "%i ",dest );
+    count++;
   }
-  return NULL;
+  fprintf(stderr, "\n" );
+
+  return translate_path(s,count);
+
 }
+
+
 
 
 int main() {
@@ -439,7 +497,9 @@ int main() {
 
   int dist = tab->height*tab->width+1;
   int best_pave = 0;
-  //tab->data[player->curry*tab->width+player->currx]->marked++;
+  int countBellFord = 0;
+  char *path = calloc(tab->height+tab->width,sizeof(char));
+  path[0] = '\0';
 
 
 
@@ -452,6 +512,7 @@ int main() {
     save_information(buf,tab,player);
     print_tab_in_error(tab);
 
+    /*
     best_pave = find_best_pave(tab,player);
     fprintf(stderr, "Best pave = %i\n",best_pave );
     if (best_pave == player->currx+player->curry*tab->width) {
@@ -461,6 +522,7 @@ int main() {
     // update the state of the game
     // send the new direction
     // or "SOUTH" or "EAST" or "WEST"
+
     if (best_pave == player->currx+player->curry*tab->width) {
       dist = tab->height*tab->width+1;
       int dest = player->currx+(player->curry-1)*tab->width;
@@ -483,16 +545,49 @@ int main() {
         rep = "SOUTH";
         dist = tab->data[dest]->distance_to_treasure;
       }
-    }else{
-      fprintf(stderr, "a la chance\n");
-      create_graph(graph,tab);
-      if (graph->nbNode != 0) {
-        bellmanford(graph,find_wich_node_itfo(tab));
+      */
+    //}else{
+    fprintf(stderr, "test 1\n");
+    if (path[0] != '\0') {
+      fprintf(stderr, "test 2\n");
+      if (path[countBellFord] == 'N') {
+        rep = "NORTH";
+        countBellFord++;
+        fprintf(stderr, "test 2.1\n");
+        }
+      if (path[countBellFord] == 'E') {
+        rep = "EAST";
+        countBellFord++;
+        fprintf(stderr, "test 2.2\n");
       }
+      if (path[countBellFord] == 'W') {
+        rep = "WEST";
+        countBellFord++;
+        fprintf(stderr, "test 2.3\n");
+      }
+      if (path[countBellFord] == 'S') {
+        rep = "SOUTH";
+        countBellFord++;
+        fprintf(stderr, "test 2.4\n");
+      }
+
+    }else{
+      fprintf(stderr, "test 3\n");
+      countBellFord = 0;
+      create_graph(graph,tab);
+      fprintf(stderr, "test 4\n");
+
+      if (graph->nbNode != 0) {
+        fprintf(stderr, "test 5\n");
+        fprintf(stderr, "%i\n",tab->width );
+        fprintf(stderr, "%i et %i \n",player->currx,player->curry );
+        path = bellmanford(graph, player->currx+player->curry*tab->width,player->posx_treasure+player->posy_treasure*tab->width);
+      }
+
       destroy_node(graph);
     }
 
-
+    //}
 
 
 
@@ -512,6 +607,8 @@ int main() {
         }
       }
     }
+
+    fprintf(stderr, "%i et %i \n",player->currx,player->curry );
     fprintf(stderr, "%s\n",rep );
 
     // get the result
@@ -520,6 +617,7 @@ int main() {
       break;
     }
   }
+
   print_marked_to_in_error(tab);
   destroy(tab,player);
   return 0;
