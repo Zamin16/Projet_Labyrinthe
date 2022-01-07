@@ -15,7 +15,6 @@ struct pave {
   size_t marked;
   char value;
   size_t distance_to_treasure;
-  size_t distance_to_best_point;
 };
 
 struct save {
@@ -61,10 +60,20 @@ void create_save(struct save *self, struct joueur *player){
   }
 }
 
-void destroy(struct save *tab,struct joueur *player){
+void destroy_node(struct Graph *graph){
+  for (size_t i = 0; i < graph->nbEdge; i++) {
+    free(graph->edge[i]);
+  }
+  free(graph->edge);
+}
+
+void destroy(struct save *tab,struct joueur *player,struct Graph *graph, char *path){
   for (size_t i = 0; i < tab->width*tab->height; i++) {
     free(tab->data[i]);
   }
+  destroy_node(graph);
+  free(graph);
+  free(path);
   free(tab->data);
   free(tab);
   free(player);
@@ -157,34 +166,12 @@ struct Edge *creat_edge(int origin, int dest, int weight){
 }
 
 
-int count_marked(struct save *tab){
-  int count = 0;
-  for (size_t i = 0; i < tab->height; i++) {
-    for (size_t j = 0; j < tab->width; j++) {
-      if (tab->data[i*tab->width+j]->marked >= 1) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
-
-void destroy_node(struct Graph *graph){
-  for (size_t i = 0; i < graph->nbEdge; i++) {
-    free(graph->edge[i]);
-  }
-  free(graph->edge);
-}
-
 
 void creat_graph_partial(struct Graph *graph,struct save *tab, int origin, int dest, int count_edge, int max){
   if (tab->data[dest]->value == 'P' || tab->data[dest]->value == '_' || tab->data[dest]->value == '0') {
     graph->edge[count_edge] = creat_edge(origin,dest,1);
-    //fprintf(stderr, "  %i to %i N with weight 1  |",origin ,graph->edge[count_edge]->v);
   }else{
     graph->edge[count_edge] = creat_edge(origin,dest,max);
-    //fprintf(stderr, "  %i to %i N with weight max  |",origin ,graph->edge[count_edge]->v);
   }
 }
 
@@ -257,58 +244,60 @@ void create_graph(struct Graph *graph,struct save *tab){
 }
 
 
-void update_partial(struct Graph *graph,struct save *tab, int origin, int dest, int count_edge, int max){
+void update_partial(struct Graph *graph,struct save *tab, int origin, int dest, int count_edge,int min, int max){
   if (tab->data[dest]->value == 'P' || tab->data[dest]->value == '_' || tab->data[dest]->value == '0' || tab->data[dest]->value == 'T') {
-    graph->edge[count_edge]->w = 1;
+    graph->edge[count_edge]->w = min;
   }else{
     graph->edge[count_edge]->w = max;
   }
 }
 
-void update(struct Graph *graph,struct save *tab, int onlymarked){
+void update(struct Graph *graph,struct save *tab,struct joueur *player, int onlymarked){
   int count_edge = 0;
   int max = graph->nbNode*2;
   int dest,origin;
+  int disty = tab->height-abs(player->posy_treasure-player->curry);
+  int distx = tab->width-abs(player->posx_treasure-player->currx);
   for (int y = 0; y < tab->height; y++) {
     for (int x = 0; x < tab->width; x++) {
 
       origin = y*tab->width+x;
       if (onlymarked == 1) {
-        if (tab->data[origin]->marked > 0 && (tab->data[origin]->value == 'P' || tab->data[origin]->value == '_' || tab->data[origin]->value == '0' || tab->data[origin]->value == 'T')) {
+        if (tab->data[origin]->marked > 0 && (tab->data[origin]->value == 'P' || tab->data[origin]->value == '_' || tab->data[origin]->value == 'T')) {
 
                   dest = (y-1)*tab->width+x;
                   if (dest >= 0 && y*tab->width >= dest) {
-                    update_partial(graph,tab,origin,dest,count_edge,max);
+                    update_partial(graph,tab,origin,dest,count_edge,1,max);
                     count_edge++;
                   }else{
-                    update_partial(graph,tab,origin,origin,count_edge,max);
+                    update_partial(graph,tab,origin,origin,count_edge,max,max);
                     count_edge++;
                   }
 
                   dest = y*tab->width+x+1;
                   if (dest < tab->height*tab->width && x+1 < tab->width) {
-                    update_partial(graph,tab,origin,dest,count_edge,max);
+                    update_partial(graph,tab,origin,dest,count_edge,1,max);
                     count_edge++;
                   }else{
-                    update_partial(graph,tab,origin,origin,count_edge,max);
+                    update_partial(graph,tab,origin,origin,count_edge,max,max);
                     count_edge++;
                   }
 
                   dest = y*tab->width+x-1;
                   if (dest >= 0 && x-1 >= 0) {
-                    update_partial(graph,tab,origin,dest,count_edge,max);
+                    update_partial(graph,tab,origin,dest,count_edge,1,max);
                     count_edge++;
                   }else{
-                    update_partial(graph,tab,origin,origin,count_edge,max);
+                    update_partial(graph,tab,origin,origin,count_edge,max,max);
                     count_edge++;
                   }
 
                   dest = (y+1)*tab->width+x;
                   if (dest < tab->height*tab->width && y+1 < tab->height) {
-                    update_partial(graph,tab,origin,dest,count_edge,max);
+                    update_partial(graph,tab,origin,dest,count_edge,1,max);
                     count_edge++;
                   }else{
-                    update_partial(graph,tab,origin,origin,count_edge,max);
+                    update_partial(graph,tab,origin,origin,count_edge,max,max);
                     count_edge++;
                   }
 
@@ -323,37 +312,37 @@ void update(struct Graph *graph,struct save *tab, int onlymarked){
 
           dest = (y-1)*tab->width+x;
           if (dest >= 0 && y*tab->width >= dest) {
-            update_partial(graph,tab,origin,dest,count_edge,max);
+            update_partial(graph,tab,origin,dest,count_edge,1,max);
             count_edge++;
           }else{
-            update_partial(graph,tab,origin,origin,count_edge,max);
+            update_partial(graph,tab,origin,origin,count_edge,max,max);
             count_edge++;
           }
 
           dest = y*tab->width+x+1;
           if (dest < tab->height*tab->width && x+1 < tab->width) {
-            update_partial(graph,tab,origin,dest,count_edge,max);
+            update_partial(graph,tab,origin,dest,count_edge,1,max);
             count_edge++;
           }else{
-            update_partial(graph,tab,origin,origin,count_edge,max);
+            update_partial(graph,tab,origin,origin,count_edge,max,max);
             count_edge++;
           }
 
           dest = y*tab->width+x-1;
           if (dest >= 0 && x-1 >= 0) {
-            update_partial(graph,tab,origin,dest,count_edge,max);
+            update_partial(graph,tab,origin,dest,count_edge,1,max);
             count_edge++;
           }else{
-            update_partial(graph,tab,origin,origin,count_edge,max);
+            update_partial(graph,tab,origin,origin,count_edge,max,max);
             count_edge++;
           }
 
           dest = (y+1)*tab->width+x;
           if (dest < tab->height*tab->width && y+1 < tab->height) {
-            update_partial(graph,tab,origin,dest,count_edge,max);
+            update_partial(graph,tab,origin,dest,count_edge,1,max);
             count_edge++;
           }else{
-            update_partial(graph,tab,origin,origin,count_edge,max);
+            update_partial(graph,tab,origin,origin,count_edge,max,max);
             count_edge++;
           }
 
@@ -372,31 +361,6 @@ void update(struct Graph *graph,struct save *tab, int onlymarked){
 }
 
 
-void FinalSolution(int dist[], int n) {
-// This function prints the final solution
-    fprintf(stderr, "\nVertex\tDistance from Source Vertex\n");
-    int i;
-
-    for (i = 0; i < n; ++i){
-      fprintf(stderr, "%d \t\t %d\n", i, dist[i]);
-    }
-}
-
-
-void display(int arr[], int size) {
-  for (int i = 0; i < size; i++) {
-    if (i%45 == 0) {
-      fprintf(stderr, "\n");
-    }
-    if (arr[i] < 10) {
-      fprintf(stderr, "0%d ", arr[i]);
-    }else{
-      fprintf(stderr, "%d ", arr[i]);
-    }
-  }
-  fprintf(stderr, "\n");
-  fprintf(stderr, "\n");
-}
 
 char *translate_path(int s[], int count){
   char *path = calloc(count,sizeof(char));
@@ -478,10 +442,6 @@ char *bellmanford(struct Graph *g, int source, int dest) {
     }
   }
 
-  //display(d,tV);
-  //display(p, tV);
-  //FinalSolution(d,tV);
-
   int s[tV];
   s[0] = dest;
   int count = 1;
@@ -492,17 +452,10 @@ char *bellmanford(struct Graph *g, int source, int dest) {
     }
     s[count] = dest;
     dest = p[dest];
-    //fprintf(stderr, "%i ",dest );
     count++;
   }
   s[count]= source;
   count++;
-
-  for (size_t i = 0; i < count; i++) {
-    fprintf(stderr, "%i ",s[i] );
-  }
-  fprintf(stderr, "\n");
-  //fprintf(stderr, "\n" );
 
   return translate_path(s,count);
 
@@ -513,31 +466,30 @@ char *bellmanford(struct Graph *g, int source, int dest) {
 void interpret_path(struct joueur *player, struct save *tab){
   int dest = player->currx+(player->curry-1)*tab->width;
   if (path[countBellFord] == 'N' && (tab->data[dest]->value == '_' || tab->data[dest]->value == 'T')) {
-    fprintf(stderr, "On continue le chemin\n" );
+    //fprintf(stderr, "On continue le chemin\n" );
     rep = "NORTH";
     countBellFord++;
   }else{
     dest = player->currx+1+player->curry*tab->width;
     if (path[countBellFord] == 'E' && (tab->data[dest]->value == '_' || tab->data[dest]->value == 'T')) {
-      fprintf(stderr, "On continue le chemin\n" );
+      //fprintf(stderr, "On continue le chemin\n" );
       rep = "EAST";
       countBellFord++;
     }else{
       dest = player->currx-1+player->curry*tab->width;
       if (path[countBellFord] == 'W' && (tab->data[dest]->value == '_' || tab->data[dest]->value == 'T')) {
-        fprintf(stderr, "On continue le chemin\n" );
+        //fprintf(stderr, "On continue le chemin\n" );
         rep = "WEST";
         countBellFord++;
       }else{
         dest = player->currx+(player->curry+1)*tab->width;
         if (path[countBellFord] == 'S' && (tab->data[dest]->value == '_' || tab->data[dest]->value == 'T')) {
-          fprintf(stderr, "On continue le chemin\n" );
+          //fprintf(stderr, "On continue le chemin\n" );
           rep = "SOUTH";
           countBellFord++;
         }else{
-          fprintf(stderr, "On continue PAS le chemin\n" );
+          //fprintf(stderr, "On continue PAS le chemin\n" );
           rep = NULL;
-          path = NULL;
           countBellFord = 0;
         }
       }
@@ -582,7 +534,7 @@ int main() {
   fprintf(stderr, "width = %i \n", tab->width);
   print_distance_to_in_error(tab);
 
-  int dist,dest;
+  int dist,prev_dist,dest;
 
 
   // Allez sur le coffre
@@ -600,43 +552,87 @@ int main() {
     }
 
     //fprintf(stderr, "%s\n",path );
-    if (path != NULL) {
+    if (countBellFord != 0) {
       interpret_path(player,tab);
     }
 
     if (rep == NULL) {
+      /*
       fprintf(stderr, "Le plus proche\n" );
-
       dist = tab->height*tab->width+1;
-      dest = player->currx+(player->curry-1)*tab->width;
-      if ((buf[1] == '_' || buf[1] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-        rep = "NORTH";
-        dist = tab->data[dest]->distance_to_treasure;
-        fprintf(stderr, "N et %i\n",dist );
+      fprintf(stderr, "%i largeur et %i longueur\n",abs(player->posy_treasure - player->curry), abs(player->posx_treasure - player->currx ));
+
+
+      if (abs(player->posx_treasure - player->currx) > abs(player->posy_treasure - player->curry)) {
+        if (player->posx_treasure - player->currx < 0) {
+          dest = player->currx-1+player->curry*tab->width;
+          if ((buf[3] == '_' || buf[3] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+            rep = "WEST";
+            dist = tab->data[dest]->distance_to_treasure;
+          }
+        }
+        if (player->posx_treasure - player->currx > 0) {
+          dest = player->currx+1+player->curry*tab->width;
+          if ((buf[4] == '_' || buf[4] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+            rep = "EAST";
+            dist = tab->data[dest]->distance_to_treasure;
+          }
+        }
       }
-      dest = player->currx+1+player->curry*tab->width;
-      if ((buf[4] == '_' || buf[4] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-        rep = "EAST";
-        dist = tab->data[dest]->distance_to_treasure;
-        fprintf(stderr, "E et %i\n",dist );
+
+      if (abs(player->posy_treasure - player->curry) >  abs(player->posx_treasure - player->currx )) {
+        if (player->posy_treasure - player->curry < 0) {
+          dest = player->currx+(player->curry-1)*tab->width;
+          if ((buf[1] == '_' || buf[1] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+            rep = "NORTH";
+            dist = tab->data[dest]->distance_to_treasure;
+          }
+        }
+        if (player->posy_treasure - player->curry > 0) {
+          dest = player->currx+(player->curry+1)*tab->width;
+          if ((buf[6] == '_' || buf[6] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+            rep = "SOUTH";
+            dist = tab->data[dest]->distance_to_treasure;
+          }
+        }
       }
-      dest = player->currx-1+player->curry*tab->width;
-      if ((buf[3] == '_' || buf[3] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-        rep = "WEST";
-        dist = tab->data[dest]->distance_to_treasure;
-        fprintf(stderr, "W et %i\n",dist );
+
+
+
+      if (rep == NULL) {
+        dest = player->currx+(player->curry-1)*tab->width;
+        if ((buf[1] == '_' || buf[1] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+          rep = "NORTH";
+          dist = tab->data[dest]->distance_to_treasure;
+        }
+        dest = player->currx+1+player->curry*tab->width;
+        if ((buf[4] == '_' || buf[4] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+          rep = "EAST";
+          dist = tab->data[dest]->distance_to_treasure;
+        }
+        dest = player->currx-1+player->curry*tab->width;
+        if ((buf[3] == '_' || buf[3] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+          rep = "WEST";
+          dist = tab->data[dest]->distance_to_treasure;
+        }
+        dest = player->currx+(player->curry+1)*tab->width;
+        if ((buf[6] == '_' || buf[6] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
+          rep = "SOUTH";
+          dist = tab->data[dest]->distance_to_treasure;
+        }
       }
-      dest = player->currx+(player->curry+1)*tab->width;
-      if ((buf[6] == '_' || buf[6] == 'T') && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-        rep = "SOUTH";
-        dist = tab->data[dest]->distance_to_treasure;
-        fprintf(stderr, "S et %i\n",dist );
+
+      if (dist > prev_dist) {
+        rep = NULL;
       }
+      prev_dist = dist;
+      */
+
     }
 
     if (rep == NULL) {
       fprintf(stderr, "BELLMANN\n" );
-      update(graph,tab,0);
+      update(graph,tab,player,0);
 
       if (graph->nbNode != 0) {
         path = bellmanford(graph, player->currx+player->curry*tab->width,player->posx_treasure+player->posy_treasure*tab->width);
@@ -694,12 +690,11 @@ int main() {
 
     if (turn == 0) {
       fprintf(stderr, "BELLMANN\n" );
-      update(graph,tab,1);
+      update(graph,tab,player,1);
 
       if (graph->nbNode != 0) {
         path = bellmanford(graph, player->currx+player->curry*tab->width,player->posx_init+player->posy_init*tab->width);
       }
-      fprintf(stderr, "%s\n",path );
       interpret_path(player,tab);
     }
 
@@ -719,7 +714,7 @@ int main() {
         }
       }
     }
-    fprintf(stderr, "%s\n",rep );
+    //fprintf(stderr, "%s\n",rep );
     rep = NULL;
 
     // get the result
@@ -730,46 +725,6 @@ int main() {
 
   }
 
-  free(path);
-  destroy_node(graph);
-  free(graph);
-  destroy(tab,player);
+  destroy(tab,player,graph,path);
   return 0;
 }
-
-/*
-best_pave = find_best_pave(tab,player);
-fprintf(stderr, "Best pave = %i\n",best_pave );
-if (best_pave == player->currx+player->curry*tab->width) {
-  fprintf(stderr, "Best pave == Joueur \n" );
-}
-
-// update the state of the game
-// send the new direction
-// or "SOUTH" or "EAST" or "WEST"
-
-if (best_pave == player->currx+player->curry*tab->width) {
-  dist = tab->height*tab->width+1;
-  int dest = player->currx+(player->curry-1)*tab->width;
-  if (buf[1] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-      rep = "NORTH";
-      dist = tab->data[dest]->distance_to_treasure;
-  }
-  dest = player->currx+1+(player->curry)*tab->width;
-  if (buf[4] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-      rep = "EAST";
-      dist = tab->data[dest]->distance_to_treasure;
-  }
-  dest = player->currx-1+(player->curry)*tab->width;
-  if (buf[3] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-    rep = "WEST";
-    dist = tab->data[dest]->distance_to_treasure;
-  }
-  dest = player->currx+(player->curry+1)*tab->width;
-  if (buf[6] == '_' && tab->data[dest]->distance_to_treasure <= dist && tab->data[dest]->marked == 0) {
-    rep = "SOUTH";
-    dist = tab->data[dest]->distance_to_treasure;
-  }
-  */
-//}else{
-//}
